@@ -15,9 +15,15 @@
       <button id="historyBtn" class="icon-btn" aria-label="История заказов">🧾</button>
     </header>
 
+    <p id="browserBanner" class="browser-banner" hidden>Для заказа откройте приложение через мессенджер MAX</p>
+
     <main id="screens">
       <section id="screen-catalog" class="screen is-active">
-        <nav id="categoryTabs" class="tabs"></nav>
+        <div class="tabs-wrap">
+          <button id="tabsPrev" class="tabs-arrow tabs-arrow-left" aria-label="Прокрутить категории влево" hidden>‹</button>
+          <nav id="categoryTabs" class="tabs"></nav>
+          <button id="tabsNext" class="tabs-arrow tabs-arrow-right" aria-label="Прокрутить категории вправо" hidden>›</button>
+        </div>
         <div id="productList" class="product-list"></div>
       </section>
 
@@ -44,6 +50,10 @@
         </div>
         <form id="checkoutForm">
           <label class="field">
+            <span>Ваше имя</span>
+            <input type="text" id="nameInput" placeholder="Иван" required />
+          </label>
+          <label class="field">
             <span>Телефон</span>
             <input type="tel" id="phoneInput" placeholder="+7 (___) ___-__-__" required />
           </label>
@@ -57,7 +67,7 @@
           </label>
           <div class="field">
             <span>Дата доставки</span>
-            <div id="deliveryDateLabel" class="delivery-date-label"></div>
+            <div id="dateOptions" class="date-options"></div>
           </div>
           <div class="field">
             <span>Время доставки</span>

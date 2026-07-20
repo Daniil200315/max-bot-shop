@@ -71,22 +71,45 @@ export async function initDb() {
   }
 
   db.run(SCHEMA);
-  seedIfEmpty();
+  syncProducts();
   persist();
 
   return db;
 }
 
-function seedIfEmpty() {
-  const row = get('SELECT COUNT(*) AS count FROM products');
-  if (row.count > 0) return;
+// Upsert по естественному ключу (name, category, weight_label) — id товара не меняется,
+// поэтому order_items.product_id и история заказов не ломаются при обновлении seed-каталога.
+// Товары, пропавшие из seed/products.js, не удаляются, а помечаются is_active=0.
+function productKey(p) {
+  return `${p.name}|||${p.category}|||${p.weight_label}`;
+}
+
+function syncProducts() {
+  const existingRows = all('SELECT id, name, category, weight_label FROM products');
+  const existingByKey = new Map(existingRows.map((r) => [productKey(r), r.id]));
+  const seedKeys = new Set(seedProducts.map(productKey));
 
   for (const p of seedProducts) {
-    db.run(
-      `INSERT INTO products (name, description, category, price_kopecks, unit, weight_label, image_url, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [p.name, p.description, p.category, p.price_kopecks, p.unit, p.weight_label, p.image_url, p.sort_order]
-    );
+    const existingId = existingByKey.get(productKey(p));
+    if (existingId) {
+      db.run(
+        `UPDATE products SET description = ?, price_kopecks = ?, unit = ?, image_url = ?, sort_order = ?, is_active = 1
+         WHERE id = ?`,
+        [p.description, p.price_kopecks, p.unit, p.image_url, p.sort_order, existingId]
+      );
+    } else {
+      db.run(
+        `INSERT INTO products (name, description, category, price_kopecks, unit, weight_label, image_url, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [p.name, p.description, p.category, p.price_kopecks, p.unit, p.weight_label, p.image_url, p.sort_order]
+      );
+    }
+  }
+
+  for (const row of existingRows) {
+    if (!seedKeys.has(productKey(row))) {
+      db.run('UPDATE products SET is_active = 0 WHERE id = ?', [row.id]);
+    }
   }
 }
 

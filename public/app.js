@@ -41,16 +41,20 @@ const BACK_MAP = {
 
 const state = {
   user: { id: null, name: '' },
+  isMaxContext: false,
   catalog: [],
   activeCategory: null,
   cart: new Map(), // product_id -> { product, quantity }
-  checkout: { dateISO: '', dateLabel: '', selectedSlot: null },
+  checkout: { dateOptions: [], selectedDateIndex: 0, selectedSlot: null },
   currentScreen: 'catalog',
   pendingModalGroup: null,
 };
 
 const el = {
   historyBtn: document.getElementById('historyBtn'),
+  browserBanner: document.getElementById('browserBanner'),
+  tabsPrev: document.getElementById('tabsPrev'),
+  tabsNext: document.getElementById('tabsNext'),
   categoryTabs: document.getElementById('categoryTabs'),
   productList: document.getElementById('productList'),
   cartFab: document.getElementById('cartFab'),
@@ -65,9 +69,10 @@ const el = {
   minOrderWarning: document.getElementById('minOrderWarning'),
   checkoutBtn: document.getElementById('checkoutBtn'),
   checkoutForm: document.getElementById('checkoutForm'),
+  nameInput: document.getElementById('nameInput'),
   phoneInput: document.getElementById('phoneInput'),
   addressInput: document.getElementById('addressInput'),
-  deliveryDateLabel: document.getElementById('deliveryDateLabel'),
+  dateOptions: document.getElementById('dateOptions'),
   slotOptions: document.getElementById('slotOptions'),
   privacyCheck: document.getElementById('privacyCheck'),
   payBtn: document.getElementById('payBtn'),
@@ -117,6 +122,8 @@ async function apiFetch(path, options = {}) {
 }
 
 // --- Пользователь MAX (см. dev.max.ru/docs/webapps/bridge) ---
+// isMaxContext=false означает открытие в обычном браузере (не из мессенджера MAX) —
+// каталог остаётся доступен как витрина, но оформление заказа/оплата блокируются.
 function resolveUser() {
   const params = new URLSearchParams(location.search);
 
@@ -128,6 +135,7 @@ function resolveUser() {
       return {
         id: u.id,
         name: [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || '',
+        isMaxContext: true,
       };
     }
   } else {
@@ -136,10 +144,15 @@ function resolveUser() {
 
   const idParam = params.get('user_id');
   if (idParam) {
-    return { id: Number(idParam), name: params.get('user_name') || 'Гость' };
+    return { id: Number(idParam), name: params.get('user_name') || 'Гость', isMaxContext: true };
   }
 
-  return { id: Date.now(), name: 'Гость' };
+  return { id: Date.now(), name: 'Гость', isMaxContext: false };
+}
+
+function applyMaxContextUI() {
+  el.browserBanner.hidden = state.isMaxContext;
+  el.historyBtn.hidden = !state.isMaxContext;
 }
 
 // --- Навигация между экранами ---
@@ -257,11 +270,57 @@ function selectCategory(category) {
   state.activeCategory = category;
   renderCategoryTabs();
   renderProducts();
+  updateTabsArrows();
 }
 
+let suppressNextTabClick = false;
+
 el.categoryTabs.addEventListener('click', (e) => {
+  if (suppressNextTabClick) { suppressNextTabClick = false; return; }
   const btn = e.target.closest('[data-category]');
   if (btn) selectCategory(btn.dataset.category);
+});
+
+// --- Прокрутка табов категорий на десктопе: стрелки, колесо мыши, drag-to-scroll ---
+function updateTabsArrows() {
+  const maxScroll = el.categoryTabs.scrollWidth - el.categoryTabs.clientWidth;
+  el.tabsPrev.hidden = maxScroll <= 4 || el.categoryTabs.scrollLeft <= 4;
+  el.tabsNext.hidden = maxScroll <= 4 || el.categoryTabs.scrollLeft >= maxScroll - 4;
+}
+
+el.categoryTabs.addEventListener('scroll', updateTabsArrows);
+window.addEventListener('resize', updateTabsArrows);
+
+el.tabsPrev.addEventListener('click', () => el.categoryTabs.scrollBy({ left: -160, behavior: 'smooth' }));
+el.tabsNext.addEventListener('click', () => el.categoryTabs.scrollBy({ left: 160, behavior: 'smooth' }));
+
+el.categoryTabs.addEventListener('wheel', (e) => {
+  if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return; // трекпад уже скроллит горизонтально
+  e.preventDefault();
+  el.categoryTabs.scrollLeft += e.deltaY;
+}, { passive: false });
+
+let tabsDrag = null;
+el.categoryTabs.addEventListener('mousedown', (e) => {
+  tabsDrag = { startX: e.pageX, startScroll: el.categoryTabs.scrollLeft, moved: false };
+  el.categoryTabs.classList.add('is-dragging');
+});
+window.addEventListener('mousemove', (e) => {
+  if (!tabsDrag) return;
+  const delta = e.pageX - tabsDrag.startX;
+  if (Math.abs(delta) > 3) tabsDrag.moved = true;
+  el.categoryTabs.scrollLeft = tabsDrag.startScroll - delta;
+});
+window.addEventListener('mouseup', () => {
+  if (!tabsDrag) return;
+  el.categoryTabs.classList.remove('is-dragging');
+  if (tabsDrag.moved) {
+    suppressNextTabClick = true;
+    // Подстраховка: если по какой-то причине клик так и не случится following mouseup,
+    // флаг не должен зависать и глушить следующий, никак не связанный клик по табам.
+    setTimeout(() => { suppressNextTabClick = false; }, 0);
+  }
+  tabsDrag = null;
 });
 
 el.productList.addEventListener('click', (e) => {
@@ -440,61 +499,101 @@ el.checkoutBtn.addEventListener('click', () => {
   showScreen('checkout');
 });
 
-// --- Тайм-слоты доставки ---
-function resolveDelivery(now = new Date()) {
-  const hour = now.getHours();
-  let targetDate = new Date(now);
-  let available;
-
-  if (hour >= 8 && hour < 19) {
-    const cutoff = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-    available = SLOT_DEFS.filter((s) => {
-      const slotEnd = new Date(targetDate);
-      slotEnd.setHours(s.end, 0, 0, 0);
-      return slotEnd > cutoff;
-    });
-    if (available.length === 0) {
-      targetDate = new Date(now);
-      targetDate.setDate(targetDate.getDate() + 1);
-      available = SLOT_DEFS.slice();
-    }
-  } else if (hour >= 19) {
-    targetDate.setDate(targetDate.getDate() + 1);
-    available = SLOT_DEFS.slice();
-  } else {
-    available = SLOT_DEFS.slice();
-  }
-
-  const dateISO = `${targetDate.getFullYear()}-${pad(targetDate.getMonth() + 1)}-${pad(targetDate.getDate())}`;
-
-  const isToday = targetDate.toDateString() === now.toDateString();
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const isTomorrow = targetDate.toDateString() === tomorrow.toDateString();
-  const dayMonth = targetDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-  const dateLabel = isToday ? `Сегодня, ${dayMonth}` : isTomorrow ? `Завтра, ${dayMonth}` : dayMonth;
-
-  const slots = available.map((s) => ({
-    value: `${pad(s.start)}:00-${pad(s.end)}:00`,
-    label: `${pad(s.start)}:00–${pad(s.end)}:00`,
-  }));
-
-  return { dateISO, dateLabel, slots };
+// --- Даты и тайм-слоты доставки ---
+// Правило: "сегодня" предлагается как вариант только если сейчас < 19:00 и на неё
+// остались слоты (с 08:00 до 19:00 — с отсечкой текущий час+2ч, до 08:00 — все слоты).
+// Дальше список всегда дополняется днями вперёд до 7 вариантов, у будущих дат — все слоты.
+function formatDateISO(date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-function prepareCheckoutScreen() {
-  const delivery = resolveDelivery();
-  state.checkout.dateISO = delivery.dateISO;
-  state.checkout.dateLabel = delivery.dateLabel;
-  state.checkout.selectedSlot = delivery.slots[0]?.value || null;
+function makeDateOption(now, offset, slotDefs) {
+  const date = new Date(now);
+  date.setDate(date.getDate() + offset);
 
-  el.deliveryDateLabel.textContent = delivery.dateLabel;
-  el.slotOptions.innerHTML = delivery.slots.map((s) => `
+  const label = offset === 0
+    ? 'Сегодня'
+    : offset === 1
+      ? 'Завтра'
+      : date.toLocaleDateString('ru-RU', { weekday: 'short' }).replace(/^./, (c) => c.toUpperCase());
+
+  return {
+    offset,
+    dateISO: formatDateISO(date),
+    label,
+    sublabel: date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }),
+    slots: slotDefs.map((s) => ({
+      value: `${pad(s.start)}:00-${pad(s.end)}:00`,
+      label: `${pad(s.start)}:00–${pad(s.end)}:00`,
+    })),
+  };
+}
+
+function buildDateOptions(now = new Date()) {
+  const options = [];
+  const hour = now.getHours();
+
+  if (hour < 19) {
+    const todaySlots = hour >= 8
+      ? SLOT_DEFS.filter((s) => {
+          const cutoff = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+          const slotEnd = new Date(now);
+          slotEnd.setHours(s.end, 0, 0, 0);
+          return slotEnd > cutoff;
+        })
+      : SLOT_DEFS.slice();
+    if (todaySlots.length > 0) options.push(makeDateOption(now, 0, todaySlots));
+  }
+
+  for (let offset = 1; options.length < 7; offset++) {
+    options.push(makeDateOption(now, offset, SLOT_DEFS.slice()));
+  }
+
+  return options;
+}
+
+function renderDateOptions() {
+  el.dateOptions.innerHTML = state.checkout.dateOptions.map((d, i) => `
+    <button type="button" class="date-btn${i === state.checkout.selectedDateIndex ? ' is-selected' : ''}" data-date-index="${i}">
+      <span>${d.label}</span>
+      <strong>${d.sublabel}</strong>
+    </button>
+  `).join('');
+}
+
+function renderSlotOptions() {
+  const option = state.checkout.dateOptions[state.checkout.selectedDateIndex];
+  const slots = option ? option.slots : [];
+  el.slotOptions.innerHTML = slots.map((s) => `
     <button type="button" class="slot-btn${s.value === state.checkout.selectedSlot ? ' is-selected' : ''}" data-slot="${s.value}">
       ${s.label}
     </button>
   `).join('');
 }
+
+function prepareCheckoutScreen() {
+  state.checkout.dateOptions = buildDateOptions();
+  state.checkout.selectedDateIndex = 0;
+  state.checkout.selectedSlot = state.checkout.dateOptions[0]?.slots[0]?.value || null;
+
+  if (!el.nameInput.value.trim()) el.nameInput.value = state.user.name || '';
+
+  el.payBtn.disabled = !state.isMaxContext;
+  el.payBtn.textContent = state.isMaxContext ? 'Оплатить' : 'Откройте через MAX';
+
+  renderDateOptions();
+  renderSlotOptions();
+}
+
+el.dateOptions.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-date-index]');
+  if (!btn) return;
+  const index = Number(btn.dataset.dateIndex);
+  state.checkout.selectedDateIndex = index;
+  state.checkout.selectedSlot = state.checkout.dateOptions[index]?.slots[0]?.value || null;
+  renderDateOptions();
+  renderSlotOptions();
+});
 
 el.slotOptions.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-slot]');
@@ -525,6 +624,14 @@ el.phoneInput.addEventListener('input', () => {
 el.checkoutForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
+  if (!state.isMaxContext) {
+    toast('Откройте мини-приложение через MAX, чтобы оформить заказ');
+    return;
+  }
+  if (!el.nameInput.value.trim()) {
+    toast('Укажите ваше имя');
+    return;
+  }
   const phoneDigits = el.phoneInput.value.replace(/\D/g, '');
   if (phoneDigits.length !== 11) {
     toast('Введите корректный номер телефона');
@@ -534,8 +641,9 @@ el.checkoutForm.addEventListener('submit', async (e) => {
     toast('Укажите адрес доставки');
     return;
   }
-  if (!state.checkout.selectedSlot) {
-    toast('Выберите время доставки');
+  const selectedDate = state.checkout.dateOptions[state.checkout.selectedDateIndex];
+  if (!selectedDate || !state.checkout.selectedSlot) {
+    toast('Выберите дату и время доставки');
     return;
   }
   if (!el.privacyCheck.checked) {
@@ -551,10 +659,10 @@ el.checkoutForm.addEventListener('submit', async (e) => {
       method: 'POST',
       body: JSON.stringify({
         user_id: state.user.id,
-        user_name: state.user.name,
+        user_name: el.nameInput.value.trim(),
         phone: el.phoneInput.value,
         delivery_address: `г. Новокузнецк, ${el.addressInput.value.trim()}`,
-        delivery_date: state.checkout.dateISO,
+        delivery_date: selectedDate.dateISO,
         delivery_time_slot: state.checkout.selectedSlot,
         items: [...state.cart.values()].map((entry) => ({
           product_id: entry.product.id,
@@ -584,8 +692,8 @@ el.checkoutForm.addEventListener('submit', async (e) => {
     console.error(err);
     toast(err.message || 'Не удалось оформить заказ');
   } finally {
-    el.payBtn.disabled = false;
-    el.payBtn.textContent = 'Оплатить';
+    el.payBtn.disabled = !state.isMaxContext;
+    el.payBtn.textContent = state.isMaxContext ? 'Оплатить' : 'Откройте через MAX';
   }
 });
 
@@ -610,6 +718,7 @@ el.backToCatalogBtn.addEventListener('click', () => {
 
 // --- История заказов ---
 async function openHistory() {
+  if (!state.isMaxContext) return;
   showScreen('history');
   try {
     const orders = await apiFetch(`/orders?user_id=${state.user.id}`);
@@ -682,7 +791,10 @@ el.historyBtn.addEventListener('click', openHistory);
 
 // --- Инициализация ---
 async function init() {
-  state.user = resolveUser();
+  const resolved = resolveUser();
+  state.user = { id: resolved.id, name: resolved.name };
+  state.isMaxContext = resolved.isMaxContext;
+  applyMaxContextUI();
 
   try {
     const { categories } = await apiFetch('/products');
@@ -690,6 +802,7 @@ async function init() {
     state.activeCategory = categories[0]?.category || null;
     renderCategoryTabs();
     renderProducts();
+    updateTabsArrows();
   } catch (err) {
     el.productList.innerHTML = '<p class="empty-state">Не удалось загрузить каталог</p>';
   }
