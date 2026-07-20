@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Родная Земля</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <script src="https://st.max.ru/js/max-web-app.js"></script>
+
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">Родная Земля</div>
+      <button id="historyBtn" class="icon-btn" aria-label="История заказов">🧾</button>
+    </header>
+
+    <main id="screens">
+      <section id="screen-catalog" class="screen is-active">
+        <nav id="categoryTabs" class="tabs"></nav>
+        <div id="productList" class="product-list"></div>
+      </section>
+
+      <section id="screen-cart" class="screen">
+        <div class="screen-header">
+          <button class="back-btn" data-back="catalog" aria-label="Назад">←</button>
+          <h2>Корзина</h2>
+        </div>
+        <div id="cartItems" class="cart-list"></div>
+        <p id="cartEmpty" class="empty-state" hidden>Корзина пуста</p>
+        <div id="cartSummary" class="summary" hidden>
+          <div class="summary-row"><span>Сумма товаров</span><span id="sumSubtotal"></span></div>
+          <div class="summary-row"><span>Доставка</span><span id="sumDelivery"></span></div>
+          <div class="summary-row summary-total"><span>Итого</span><span id="sumTotal"></span></div>
+        </div>
+        <p id="minOrderWarning" class="warning" hidden>Минимальный заказ — 500 ₽</p>
+        <button id="checkoutBtn" class="btn-primary" disabled>Оформить заказ</button>
+      </section>
+
+      <section id="screen-checkout" class="screen">
+        <div class="screen-header">
+          <button class="back-btn" data-back="cart" aria-label="Назад">←</button>
+          <h2>Оформление</h2>
+        </div>
+        <form id="checkoutForm">
+          <label class="field">
+            <span>Телефон</span>
+            <input type="tel" id="phoneInput" placeholder="+7 (___) ___-__-__" required />
+          </label>
+          <label class="field">
+            <span>Город</span>
+            <input type="text" value="г. Новокузнецк" disabled />
+          </label>
+          <label class="field">
+            <span>Улица, дом, квартира</span>
+            <input type="text" id="addressInput" placeholder="ул. Ленина, д. 5, кв. 12" required />
+          </label>
+          <div class="field">
+            <span>Дата доставки</span>
+            <div id="deliveryDateLabel" class="delivery-date-label"></div>
+          </div>
+          <div class="field">
+            <span>Время доставки</span>
+            <div id="slotOptions" class="slot-options"></div>
+          </div>
+          <p class="hint">Доставка будет в течение выбранного интервала</p>
+          <label class="checkbox-row">
+            <input type="checkbox" id="privacyCheck" required />
+            <span>Согласен с <a href="https://rdzm.ru/info/privacy-policy/" target="_blank" rel="noopener">политикой обработки персональных данных</a></span>
+          </label>
+          <button type="submit" id="payBtn" class="btn-primary">Оплатить</button>
+        </form>
+      </section>
+
+      <section id="screen-success" class="screen">
+        <div class="success-content">
+          <div class="success-icon">✅</div>
+          <h2>Заказ оформлен</h2>
+          <p id="successOrderInfo" class="success-info"></p>
+          <p class="hint">Наш сотрудник свяжется с вами для подтверждения</p>
+          <button id="backToCatalogBtn" class="btn-primary">Вернуться в каталог</button>
+        </div>
+      </section>
+
+      <section id="screen-history" class="screen">
+        <div class="screen-header">
+          <button class="back-btn" data-back="catalog" aria-label="Назад">←</button>
+          <h2>История заказов</h2>
+        </div>
+        <div id="historyList" class="history-list"></div>
+        <p id="historyEmpty" class="empty-state" hidden>Заказов пока нет</p>
+      </section>
+
+      <section id="screen-order-detail" class="screen">
+        <div class="screen-header">
+          <button class="back-btn" data-back="history" aria-label="Назад">←</button>
+          <h2>Заказ</h2>
+        </div>
+        <div id="orderDetailContent"></div>
+      </section>
+    </main>
+
+    <button id="cartFab" class="cart-fab" hidden>
+      <span class="cart-fab-icon">🛒</span>
+      <span id="cartFabCount" class="cart-fab-badge">0</span>
+      <span id="cartFabSum" class="cart-fab-sum"></span>
+    </button>
+  </div>
+
+  <div id="portionModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-sheet">
+      <h3 id="portionModalTitle"></h3>
+      <div id="portionOptions" class="portion-options"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

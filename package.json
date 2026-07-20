@@ -1,0 +1,16 @@
+{
+  "name": "rdzm-shop-bot",
+  "version": "1.0.0",
+  "description": "MAX mini-app shop bot for Rodnaya Zemlya dairy products",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@maxhub/max-bot-api": "0.2.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "sql.js": "^1.10.3"
+  }
+}
