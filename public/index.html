@@ -38,9 +38,19 @@
           <div class="summary-row"><span>Сумма товаров</span><span id="sumSubtotal"></span></div>
           <div class="summary-row"><span>Доставка</span><span id="sumDelivery"></span></div>
           <div class="summary-row summary-total"><span>Итого</span><span id="sumTotal"></span></div>
+          <p id="freeDeliveryHint" class="free-delivery-hint" hidden></p>
         </div>
         <p id="minOrderWarning" class="warning" hidden>Минимальный заказ — 500 ₽</p>
         <button id="checkoutBtn" class="btn-primary" disabled>Оформить заказ</button>
+
+        <div class="delivery-info-block">
+          <h4>Доставка</h4>
+          <p>Доставка по г. Новокузнецку</p>
+          <p>Минимальный заказ: 500 ₽</p>
+          <p>Доставка 149 ₽ при заказе от 500 до 749 ₽</p>
+          <p>Бесплатная доставка при заказе от 750 ₽</p>
+          <p>Доставка в течение выбранного 2-часового интервала</p>
+        </div>
       </section>
 
       <section id="screen-checkout" class="screen">
@@ -51,19 +61,34 @@
         <form id="checkoutForm">
           <label class="field">
             <span>Ваше имя</span>
-            <input type="text" id="nameInput" placeholder="Иван" required />
+            <input type="text" id="nameInput" placeholder="Иван" />
           </label>
           <label class="field">
             <span>Телефон</span>
-            <input type="tel" id="phoneInput" placeholder="+7 (___) ___-__-__" required />
+            <input type="tel" id="phoneInput" placeholder="+7 (___) ___-__-__" />
           </label>
           <label class="field">
             <span>Город</span>
             <input type="text" value="г. Новокузнецк" disabled />
           </label>
           <label class="field">
+            <span>Район</span>
+            <select id="districtSelect">
+              <option value="" disabled selected>Выберите район</option>
+              <option>Центральный</option>
+              <option>Кузнецкий</option>
+              <option>Заводской</option>
+              <option>Новоильинский</option>
+              <option>Орджоникидзевский</option>
+              <option>Куйбышевский</option>
+              <option>Сосновка</option>
+              <option>Абашево</option>
+              <option>Таргай</option>
+            </select>
+          </label>
+          <label class="field">
             <span>Улица, дом, квартира</span>
-            <input type="text" id="addressInput" placeholder="ул. Ленина, д. 5, кв. 12" required />
+            <input type="text" id="addressInput" placeholder="ул. Ленина, д. 5, кв. 12" />
           </label>
           <div class="field">
             <span>Дата доставки</span>
@@ -74,8 +99,13 @@
             <div id="slotOptions" class="slot-options"></div>
           </div>
           <p class="hint">Доставка будет в течение выбранного интервала</p>
+          <div id="checkoutSummary" class="summary">
+            <div class="summary-row"><span>Сумма товаров</span><span id="checkoutSumSubtotal"></span></div>
+            <div class="summary-row"><span>Доставка</span><span id="checkoutSumDelivery"></span></div>
+            <div class="summary-row summary-total"><span>Итого</span><span id="checkoutSumTotal"></span></div>
+          </div>
           <label class="checkbox-row">
-            <input type="checkbox" id="privacyCheck" required />
+            <input type="checkbox" id="privacyCheck" />
             <span>Согласен с <a href="https://rdzm.ru/info/privacy-policy/" target="_blank" rel="noopener">политикой обработки персональных данных</a></span>
           </label>
           <button type="submit" id="payBtn" class="btn-primary">Оплатить</button>
@@ -122,6 +152,25 @@
     <div class="modal-sheet">
       <h3 id="portionModalTitle"></h3>
       <div id="portionOptions" class="portion-options"></div>
+    </div>
+  </div>
+
+  <div id="productModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-sheet product-modal-sheet">
+      <div class="product-modal-photo" id="productModalPhoto"></div>
+      <h3 id="productModalName"></h3>
+      <div class="product-modal-meta" id="productModalMeta"></div>
+      <div class="product-modal-price" id="productModalPrice"></div>
+      <div id="productModalDescription" class="product-modal-block" hidden>
+        <h4>Описание</h4>
+        <p id="productModalDescriptionText"></p>
+      </div>
+      <div id="productModalNutrition" class="product-modal-block" hidden>
+        <h4>БЖУ на 100 г</h4>
+        <p id="productModalNutritionText"></p>
+      </div>
+      <div id="productModalAction" class="product-modal-action"></div>
     </div>
   </div>
 

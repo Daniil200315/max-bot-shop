@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS products (
   weight_label TEXT DEFAULT '',
   image_url TEXT DEFAULT '',
   is_active INTEGER NOT NULL DEFAULT 1,
-  sort_order INTEGER NOT NULL DEFAULT 0
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  nutrition_info TEXT DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS orders (
@@ -28,6 +29,7 @@ CREATE TABLE IF NOT EXISTS orders (
   user_name TEXT NOT NULL DEFAULT '',
   phone TEXT NOT NULL,
   delivery_address TEXT NOT NULL,
+  district TEXT NOT NULL DEFAULT '',
   delivery_date TEXT NOT NULL,
   delivery_time_slot TEXT NOT NULL,
   subtotal_kopecks INTEGER NOT NULL,
@@ -71,10 +73,25 @@ export async function initDb() {
   }
 
   db.run(SCHEMA);
+  runMigrations();
   syncProducts();
   persist();
 
   return db;
+}
+
+// CREATE TABLE IF NOT EXISTS не добавляет колонки в уже существующую таблицу —
+// для баз, созданных до этого поля, дотягиваем схему явным ALTER TABLE.
+function ensureColumn(table, column, definition) {
+  const columns = all(`PRAGMA table_info(${table})`);
+  if (!columns.some((c) => c.name === column)) {
+    db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+function runMigrations() {
+  ensureColumn('products', 'nutrition_info', "TEXT DEFAULT ''");
+  ensureColumn('orders', 'district', "TEXT NOT NULL DEFAULT ''");
 }
 
 // Upsert по естественному ключу (name, category, weight_label) — id товара не меняется,
