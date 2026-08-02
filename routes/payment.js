@@ -1,5 +1,5 @@
 import express from 'express';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { all, get, run } from '../db.js';
 import { formatSupportOrderMessage, supportStatusKeyboard, clientStatusMessage } from '../lib/messages.js';
 
@@ -9,6 +9,17 @@ function yookassaAuthHeader() {
   const shopId = process.env.YOOKASSA_SHOP_ID;
   const secretKey = process.env.YOOKASSA_SECRET_KEY;
   return 'Basic ' + Buffer.from(`${shopId}:${secretKey}`).toString('base64');
+}
+
+// Детерминированный ключ из order_id (а не randomUUID на каждый вызов) — повторный
+// запрос создания платежа с фронта на тот же заказ (двойной клик, ретрай сети)
+// не должен породить второй платёж на стороне ЮKassa.
+function idempotenceKeyForOrder(orderId) {
+  return createHash('sha256').update(`create-payment-order-${orderId}`).digest('hex');
+}
+
+function amountToKopecks(value) {
+  return Math.round(Number(value) * 100);
 }
 
 // bot instance is injected from server.js so this module doesn't need to import bot.js directly
@@ -28,7 +39,7 @@ export function createPaymentRouter(bot) {
         headers: {
           'Content-Type': 'application/json',
           Authorization: yookassaAuthHeader(),
-          'Idempotence-Key': randomUUID(),
+          'Idempotence-Key': idempotenceKeyForOrder(order.id),
         },
         body: JSON.stringify({
           amount: { value: (order.total_kopecks / 100).toFixed(2), currency: 'RUB' },
@@ -63,23 +74,73 @@ export function createPaymentRouter(bot) {
   });
 
   paymentRouter.post('/webhook', express.json(), async (req, res) => {
-    // ВАЖНО: ЮKassa не подписывает вебхуки по умолчанию - подлинность здесь
-    // полагается на секретность URL. Для продакшена стоит сверять IP ЮKassa.
+    // ВАЖНО: ЮKassa не подписывает вебхуки, а URL не является секретом (путь
+    // предсказуем, адрес прописан в личном кабинете) — поэтому телу запроса не
+    // доверяем вообще. Используем только object.id из уведомления, чтобы
+    // запросить у ЮKassa настоящее состояние платежа, и дальше работаем
+    // исключительно с ответом API (статус, сумма, валюта, metadata.order_id).
     const notification = req.body || {};
-    const paymentObject = notification.object;
+    const event = notification.event;
+    const paymentId = notification.object?.id;
 
-    if (!paymentObject) return res.sendStatus(200);
+    console.log('Webhook получен:', { event, payment_id: paymentId });
 
-    const orderId = paymentObject.metadata?.order_id;
-    const order = orderId ? get('SELECT * FROM orders WHERE id = ?', [orderId]) : null;
-
-    if (!order) {
-      console.warn('Webhook: order not found for payment', paymentObject.id);
+    if (!paymentId) {
+      console.warn('Webhook: в теле нет object.id, игнорируем', { event });
       return res.sendStatus(200);
     }
 
-    if (notification.event === 'payment.succeeded') {
-      run('UPDATE payments SET status = ?, updated_at = datetime(\'now\') WHERE yookassa_id = ?', ['succeeded', paymentObject.id]);
+    if (event !== 'payment.succeeded' && event !== 'payment.canceled') {
+      console.log('Webhook: событие не обрабатывается, пропуск', { event, payment_id: paymentId });
+      return res.sendStatus(200);
+    }
+
+    let apiResponse;
+    try {
+      apiResponse = await fetch(`${YOOKASSA_API}/payments/${paymentId}`, {
+        headers: { Authorization: yookassaAuthHeader() },
+      });
+    } catch (err) {
+      console.error('Webhook: ЮKassa API недоступна, нужен ретрай', { payment_id: paymentId, error: err.message });
+      return res.sendStatus(500);
+    }
+
+    if (apiResponse.status === 404) {
+      console.warn('Webhook: платёж с таким id не найден в ЮKassa (похоже на подделку)', { event, payment_id: paymentId });
+      return res.sendStatus(200);
+    }
+
+    if (!apiResponse.ok) {
+      console.error('Webhook: ошибка ЮKassa API, нужен ретрай', { payment_id: paymentId, status: apiResponse.status });
+      return res.sendStatus(500);
+    }
+
+    const payment = await apiResponse.json();
+    const orderId = payment.metadata?.order_id;
+    const order = orderId ? get('SELECT * FROM orders WHERE id = ?', [orderId]) : null;
+
+    if (!order) {
+      console.warn('Webhook: заказ не найден по metadata.order_id из ЮKassa', { payment_id: payment.id, order_id: orderId });
+      return res.sendStatus(200);
+    }
+
+    if (event === 'payment.succeeded') {
+      const amountMatches = amountToKopecks(payment.amount?.value) === order.total_kopecks;
+      const currencyMatches = payment.amount?.currency === 'RUB';
+
+      if (payment.status !== 'succeeded' || !payment.paid || !amountMatches || !currencyMatches) {
+        console.warn('Webhook: payment.succeeded не прошёл проверку, заказ не тронут', {
+          payment_id: payment.id,
+          order_id: order.id,
+          status: payment.status,
+          paid: payment.paid,
+          amountMatches,
+          currencyMatches,
+        });
+        return res.sendStatus(200);
+      }
+
+      run('UPDATE payments SET status = ?, updated_at = datetime(\'now\') WHERE yookassa_id = ?', ['succeeded', payment.id]);
 
       if (order.status === 'created') {
         run('UPDATE orders SET status = ?, updated_at = datetime(\'now\') WHERE id = ?', ['paid', order.id]);
@@ -87,9 +148,19 @@ export function createPaymentRouter(bot) {
         const items = all('SELECT * FROM order_items WHERE order_id = ?', [order.id]);
         await notifySupportChat(bot, { ...paidOrder, items });
         await notifyClient(bot, paidOrder.user_id, 'paid', paidOrder);
+        console.log('Webhook: заказ помечен оплаченным', { order_id: order.id, payment_id: payment.id });
+      } else {
+        console.log('Webhook: заказ уже был обработан ранее, повторное уведомление не отправляется', {
+          order_id: order.id,
+          order_status: order.status,
+          payment_id: payment.id,
+        });
       }
-    } else if (notification.event === 'payment.canceled') {
-      run('UPDATE payments SET status = ?, updated_at = datetime(\'now\') WHERE yookassa_id = ?', ['cancelled', paymentObject.id]);
+    } else if (event === 'payment.canceled') {
+      // Отменённый (не состоявшийся) платёж — заказ остаётся в created, чтобы
+      // клиент мог повторно оплатить; уведомление сотрудникам не отправляется.
+      run('UPDATE payments SET status = ?, updated_at = datetime(\'now\') WHERE yookassa_id = ?', ['cancelled', payment.id]);
+      console.log('Webhook: платёж отменён', { order_id: order.id, payment_id: payment.id });
     }
 
     res.sendStatus(200);

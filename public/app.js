@@ -4,15 +4,6 @@ const MIN_ORDER_KOPECKS = 50000;
 const FREE_DELIVERY_THRESHOLD_KOPECKS = 75000;
 const DELIVERY_FEE_KOPECKS = 14900;
 
-const SLOT_DEFS = [
-  { start: 8, end: 10 },
-  { start: 10, end: 12 },
-  { start: 12, end: 14 },
-  { start: 14, end: 16 },
-  { start: 16, end: 18 },
-  { start: 18, end: 20 },
-];
-
 const CATEGORY_ICON = {
   'Молоко': '🥛',
   'Кисломолочные напитки': '🧃',
@@ -111,10 +102,6 @@ function escapeHtml(str) {
 
 function formatRub(kopecks) {
   return (kopecks / 100).toLocaleString('ru-RU');
-}
-
-function pad(n) {
-  return String(n).padStart(2, '0');
 }
 
 let toastTimer = null;
@@ -597,63 +584,14 @@ el.cartFab.addEventListener('click', () => { renderCart(); showScreen('cart'); }
 
 el.checkoutBtn.addEventListener('click', () => {
   if (el.checkoutBtn.disabled) return;
-  prepareCheckoutScreen();
   showScreen('checkout');
+  prepareCheckoutScreen();
 });
 
 // --- Даты и тайм-слоты доставки ---
-// Правило: "сегодня" предлагается как вариант только если сейчас < 19:00 и на неё
-// остались слоты (с 08:00 до 19:00 — с отсечкой текущий час+2ч, до 08:00 — все слоты).
-// Дальше список всегда дополняется днями вперёд до 3 вариантов, у будущих дат — все слоты.
-function formatDateISO(date) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-function makeDateOption(now, offset, slotDefs) {
-  const date = new Date(now);
-  date.setDate(date.getDate() + offset);
-
-  const label = offset === 0
-    ? 'Сегодня'
-    : offset === 1
-      ? 'Завтра'
-      : date.toLocaleDateString('ru-RU', { weekday: 'short' }).replace(/^./, (c) => c.toUpperCase());
-
-  return {
-    offset,
-    dateISO: formatDateISO(date),
-    label,
-    sublabel: date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }),
-    slots: slotDefs.map((s) => ({
-      value: `${pad(s.start)}:00-${pad(s.end)}:00`,
-      label: `${pad(s.start)}:00–${pad(s.end)}:00`,
-    })),
-  };
-}
-
-function buildDateOptions(now = new Date()) {
-  const options = [];
-  const hour = now.getHours();
-
-  if (hour < 19) {
-    const todaySlots = hour >= 8
-      ? SLOT_DEFS.filter((s) => {
-          const cutoff = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-          const slotEnd = new Date(now);
-          slotEnd.setHours(s.end, 0, 0, 0);
-          return slotEnd > cutoff;
-        })
-      : SLOT_DEFS.slice();
-    if (todaySlots.length > 0) options.push(makeDateOption(now, 0, todaySlots));
-  }
-
-  for (let offset = 1; options.length < 3; offset++) {
-    options.push(makeDateOption(now, offset, SLOT_DEFS.slice()));
-  }
-
-  return options;
-}
-
+// Список доступных дат/слотов считает сервер (см. lib/delivery.js) по местному
+// времени контейнера — клиент лишь отображает то, что пришло, чтобы покупатели
+// в разных часовых поясах не видели разный набор дат.
 function renderDateOptions() {
   el.dateOptions.innerHTML = state.checkout.dateOptions.map((d, i) => `
     <button type="button" class="date-btn${i === state.checkout.selectedDateIndex ? ' is-selected' : ''}" data-date-index="${i}">
@@ -685,13 +623,25 @@ function renderCheckoutSummary() {
   el.checkoutSumTotal.textContent = `${formatRub(total)} ₽`;
 }
 
-function prepareCheckoutScreen() {
-  state.checkout.dateOptions = buildDateOptions();
-  state.checkout.selectedDateIndex = 0;
-  state.checkout.selectedSlot = state.checkout.dateOptions[0]?.slots[0]?.value || null;
-
+async function prepareCheckoutScreen() {
   if (!el.nameInput.value.trim()) el.nameInput.value = state.user.name || '';
   el.districtSelect.value = '';
+
+  el.payBtn.disabled = true;
+  el.payBtn.textContent = 'Загрузка…';
+  state.checkout.dateOptions = [];
+  state.checkout.selectedDateIndex = 0;
+  state.checkout.selectedSlot = null;
+  renderDateOptions();
+  renderSlotOptions();
+
+  try {
+    const { dateOptions } = await apiFetch('/delivery-options');
+    state.checkout.dateOptions = dateOptions;
+    state.checkout.selectedSlot = dateOptions[0]?.slots[0]?.value || null;
+  } catch (err) {
+    toast('Не удалось загрузить доступные даты доставки');
+  }
 
   el.payBtn.disabled = !state.isMaxContext;
   el.payBtn.textContent = state.isMaxContext ? 'Оплатить' : 'Откройте через MAX';

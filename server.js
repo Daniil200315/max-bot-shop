@@ -16,6 +16,9 @@ process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', 
 process.on('uncaughtException', (err) => console.error('Uncaught exception:', err));
 
 async function main() {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  console.log(`Локальное время сервера: ${new Date().toString()} (таймзона: ${tz})`);
+
   await initDb();
 
   const bot = createBot();

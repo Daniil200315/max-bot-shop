@@ -1,6 +1,7 @@
 import express from 'express';
 import { all, get, insert } from '../db.js';
 import { MIN_ORDER_KOPECKS, isBelowMinimum, computeDeliveryFee } from '../lib/pricing.js';
+import { buildDateOptions, isDeliverySelectionValid } from '../lib/delivery.js';
 
 export const apiRouter = express.Router();
 
@@ -52,6 +53,10 @@ apiRouter.get('/products/:id', (req, res) => {
   res.json(toProductDto(product));
 });
 
+apiRouter.get('/delivery-options', (req, res) => {
+  res.json({ dateOptions: buildDateOptions() });
+});
+
 apiRouter.post('/orders', (req, res) => {
   const {
     user_id,
@@ -69,6 +74,9 @@ apiRouter.post('/orders', (req, res) => {
   }
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'Корзина пуста' });
+  }
+  if (!isDeliverySelectionValid(delivery_date, delivery_time_slot)) {
+    return res.status(400).json({ error: 'Выбранные дата и время доставки уже недоступны, обновите страницу' });
   }
 
   const resolvedItems = [];
