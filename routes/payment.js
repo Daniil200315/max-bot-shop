@@ -1,6 +1,6 @@
 import express from 'express';
 import { randomUUID } from 'crypto';
-import { get, run } from '../db.js';
+import { all, get, run } from '../db.js';
 import { formatSupportOrderMessage, supportStatusKeyboard, clientStatusMessage } from '../lib/messages.js';
 
 const YOOKASSA_API = 'https://api.yookassa.ru/v3';
@@ -34,7 +34,7 @@ export function createPaymentRouter(bot) {
           amount: { value: (order.total_kopecks / 100).toFixed(2), currency: 'RUB' },
           confirmation: {
             type: 'redirect',
-            return_url: `${baseUrl}/order-success?order_id=${order.id}`,
+            return_url: `${baseUrl}/?order_success=${order.id}`,
           },
           capture: true,
           description: `Заказ №${order.id} - Родная Земля`,
@@ -84,8 +84,8 @@ export function createPaymentRouter(bot) {
       if (order.status === 'created') {
         run('UPDATE orders SET status = ?, updated_at = datetime(\'now\') WHERE id = ?', ['paid', order.id]);
         const paidOrder = get('SELECT * FROM orders WHERE id = ?', [order.id]);
-        // Сотрудников уже уведомили при создании заказа (см. routes/api.js) —
-        // повторно слать не нужно, чтобы не задваивать сообщения в чате.
+        const items = all('SELECT * FROM order_items WHERE order_id = ?', [order.id]);
+        await notifySupportChat(bot, { ...paidOrder, items });
         await notifyClient(bot, paidOrder.user_id, 'paid', paidOrder);
       }
     } else if (notification.event === 'payment.canceled') {

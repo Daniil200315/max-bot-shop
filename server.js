@@ -3,7 +3,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { initDb } from './db.js';
-import { createApiRouter } from './routes/api.js';
+import { apiRouter } from './routes/api.js';
 import { createPaymentRouter } from './routes/payment.js';
 import { createBot, registerBotHandlers } from './bot.js';
 
@@ -26,12 +26,7 @@ async function main() {
   app.use(express.static(PUBLIC_DIR));
 
   app.use('/api/payments', createPaymentRouter(bot));
-  app.use('/api', createApiRouter(bot));
-
-  // SPA fallback: возврат ЮKassa после оплаты ведёт сюда, отдаём тот же index.html
-  app.get('/order-success', (req, res) => {
-    res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
-  });
+  app.use('/api', apiRouter);
 
   const port = process.env.PORT || 3000;
   app.listen(port, () => console.log(`Server started on :${port}`));

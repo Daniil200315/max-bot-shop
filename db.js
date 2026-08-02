@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS products (
   image_url TEXT DEFAULT '',
   is_active INTEGER NOT NULL DEFAULT 1,
   sort_order INTEGER NOT NULL DEFAULT 0,
-  nutrition_info TEXT DEFAULT ''
+  nutrition_info TEXT DEFAULT '',
+  ingredients TEXT DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS orders (
@@ -91,6 +92,7 @@ function ensureColumn(table, column, definition) {
 
 function runMigrations() {
   ensureColumn('products', 'nutrition_info', "TEXT DEFAULT ''");
+  ensureColumn('products', 'ingredients', "TEXT DEFAULT ''");
   ensureColumn('orders', 'district', "TEXT NOT NULL DEFAULT ''");
 }
 
@@ -107,18 +109,25 @@ function syncProducts() {
   const seedKeys = new Set(seedProducts.map(productKey));
 
   for (const p of seedProducts) {
+    // is_active необязателен в seed-записи: по умолчанию товар активен, но для
+    // снятых с продажи (например, деактивированные вкусы йогурта) можно явно
+    // указать is_active: false — так их БЖУ/состав всё равно обновляются синком.
+    const isActive = p.is_active === false ? 0 : 1;
     const existingId = existingByKey.get(productKey(p));
     if (existingId) {
       db.run(
-        `UPDATE products SET description = ?, price_kopecks = ?, unit = ?, image_url = ?, sort_order = ?, is_active = 1
+        `UPDATE products SET description = ?, price_kopecks = ?, unit = ?, image_url = ?, sort_order = ?,
+           nutrition_info = ?, ingredients = ?, is_active = ?
          WHERE id = ?`,
-        [p.description, p.price_kopecks, p.unit, p.image_url, p.sort_order, existingId]
+        [p.description, p.price_kopecks, p.unit, p.image_url, p.sort_order,
+          p.nutrition_info || '', p.ingredients || '', isActive, existingId]
       );
     } else {
       db.run(
-        `INSERT INTO products (name, description, category, price_kopecks, unit, weight_label, image_url, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [p.name, p.description, p.category, p.price_kopecks, p.unit, p.weight_label, p.image_url, p.sort_order]
+        `INSERT INTO products (name, description, category, price_kopecks, unit, weight_label, image_url, sort_order, nutrition_info, ingredients, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [p.name, p.description, p.category, p.price_kopecks, p.unit, p.weight_label, p.image_url, p.sort_order,
+          p.nutrition_info || '', p.ingredients || '', isActive]
       );
     }
   }

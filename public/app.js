@@ -47,8 +47,8 @@ const state = {
   cart: new Map(), // product_id -> { product, quantity }
   checkout: { dateOptions: [], selectedDateIndex: 0, selectedSlot: null },
   currentScreen: 'catalog',
-  pendingModalGroup: null,
   pendingModalProduct: null,
+  pendingModalVariants: null,
 };
 
 const el = {
@@ -87,18 +87,18 @@ const el = {
   historyList: document.getElementById('historyList'),
   historyEmpty: document.getElementById('historyEmpty'),
   orderDetailContent: document.getElementById('orderDetailContent'),
-  portionModal: document.getElementById('portionModal'),
-  portionModalTitle: document.getElementById('portionModalTitle'),
-  portionOptions: document.getElementById('portionOptions'),
   productModal: document.getElementById('productModal'),
   productModalPhoto: document.getElementById('productModalPhoto'),
   productModalName: document.getElementById('productModalName'),
   productModalMeta: document.getElementById('productModalMeta'),
   productModalPrice: document.getElementById('productModalPrice'),
+  productModalPortions: document.getElementById('productModalPortions'),
   productModalDescription: document.getElementById('productModalDescription'),
   productModalDescriptionText: document.getElementById('productModalDescriptionText'),
   productModalNutrition: document.getElementById('productModalNutrition'),
   productModalNutritionText: document.getElementById('productModalNutritionText'),
+  productModalIngredients: document.getElementById('productModalIngredients'),
+  productModalIngredientsText: document.getElementById('productModalIngredientsText'),
   productModalAction: document.getElementById('productModalAction'),
   toast: document.getElementById('toast'),
 };
@@ -176,7 +176,7 @@ function showScreen(name) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.remove('is-active'));
   document.getElementById(`screen-${name}`).classList.add('is-active');
   state.currentScreen = name;
-  el.cartFab.hidden = name !== 'catalog' || getCartTotalQuantity() === 0;
+  renderCartFab();
 
   if (window.WebApp?.BackButton) {
     if (name === 'catalog' || name === 'success') {
@@ -361,20 +361,55 @@ el.productList.addEventListener('click', (e) => {
   if (add) { addToCart(Number(add.dataset.add), 1); renderProducts(); renderCartFab(); return; }
   if (incr) { addToCart(Number(incr.dataset.incr), 1); renderProducts(); renderCartFab(); return; }
   if (decr) { removeFromCart(Number(decr.dataset.decr), 1); renderProducts(); renderCartFab(); return; }
-  if (choose) { openPortionModal(choose.dataset.choose); return; }
+  if (choose) { openGroupModal(choose.dataset.choose); return; }
   if (openDetail) openProductModal(Number(openDetail.dataset.openDetail));
 });
 
-// --- Модалка-карточка товара (описание, БЖУ, добавление в корзину) ---
+// --- Модалка-карточка товара: фото, описание, БЖУ, состав, добавление в корзину ---
+// Для обычных товаров variants = [сам товар]. Для сыра (unit='порция') variants —
+// все порции этого сорта, с переключателем ~200/~300/~500 г внутри той же карточки.
 function openProductModal(productId) {
   const product = findProductById(productId);
   if (!product) return;
-  state.pendingModalProduct = product;
+  openModalWithVariants([product], product);
+}
+
+function openGroupModal(groupName) {
+  const bucket = state.catalog.find((c) => c.category === state.activeCategory);
+  const variants = (bucket?.products || []).filter((p) => p.name === groupName);
+  if (variants.length === 0) return;
+  openModalWithVariants(variants, variants[0]);
+}
+
+function openModalWithVariants(variants, selected) {
+  state.pendingModalVariants = variants;
+  state.pendingModalProduct = selected;
+  renderProductModalContent();
+  el.productModal.hidden = false;
+}
+
+function renderProductModalContent() {
+  const product = state.pendingModalProduct;
+  const variants = state.pendingModalVariants;
+  if (!product) return;
 
   el.productModalPhoto.innerHTML = photoMarkup(product);
   el.productModalName.textContent = product.name;
   el.productModalMeta.textContent = product.weight_label;
   el.productModalPrice.textContent = `${formatRub(product.price_kopecks)} ₽`;
+
+  if (variants.length > 1) {
+    el.productModalPortions.hidden = false;
+    el.productModalPortions.innerHTML = variants.map((v) => `
+      <button type="button" class="portion-option${v.id === product.id ? ' is-selected' : ''}" data-modal-portion="${v.id}">
+        <span>${escapeHtml(v.weight_label)}</span>
+        <span class="portion-option-price">${formatRub(v.price_kopecks)} ₽</span>
+      </button>
+    `).join('');
+  } else {
+    el.productModalPortions.hidden = true;
+    el.productModalPortions.innerHTML = '';
+  }
 
   el.productModalDescription.hidden = !product.description;
   el.productModalDescriptionText.textContent = product.description || '';
@@ -382,8 +417,10 @@ function openProductModal(productId) {
   el.productModalNutrition.hidden = !product.nutrition_info;
   el.productModalNutritionText.textContent = product.nutrition_info || '';
 
+  el.productModalIngredients.hidden = !product.ingredients;
+  el.productModalIngredientsText.textContent = product.ingredients || '';
+
   renderProductModalAction();
-  el.productModal.hidden = false;
 }
 
 function renderProductModalAction() {
@@ -402,10 +439,21 @@ function renderProductModalAction() {
 function closeProductModal() {
   el.productModal.hidden = true;
   state.pendingModalProduct = null;
+  state.pendingModalVariants = null;
 }
 
 el.productModal.addEventListener('click', (e) => {
   if (e.target.closest('[data-close-modal]')) { closeProductModal(); return; }
+
+  const portion = e.target.closest('[data-modal-portion]');
+  if (portion) {
+    const variant = state.pendingModalVariants.find((v) => v.id === Number(portion.dataset.modalPortion));
+    if (variant) {
+      state.pendingModalProduct = variant;
+      renderProductModalContent();
+    }
+    return;
+  }
 
   const add = e.target.closest('[data-modal-add]');
   const incr = e.target.closest('[data-modal-incr]');
@@ -419,43 +467,6 @@ el.productModal.addEventListener('click', (e) => {
   renderProducts();
   renderCartFab();
   renderProductModalAction();
-});
-
-// --- Модалка выбора порции сыра ---
-function openPortionModal(groupName) {
-  const bucket = state.catalog.find((c) => c.category === state.activeCategory);
-  const variants = (bucket?.products || []).filter((p) => p.name === groupName);
-  state.pendingModalGroup = variants;
-
-  el.portionModalTitle.textContent = groupName;
-  el.portionOptions.innerHTML = variants.map((v) => `
-    <div class="portion-option" data-variant="${v.id}">
-      <span>${escapeHtml(v.weight_label)}</span>
-      <span class="portion-option-price">${formatRub(v.price_kopecks)} ₽</span>
-    </div>
-  `).join('');
-
-  el.portionModal.hidden = false;
-}
-
-function closePortionModal() {
-  el.portionModal.hidden = true;
-  state.pendingModalGroup = null;
-}
-
-el.portionModal.addEventListener('click', (e) => {
-  if (e.target.closest('[data-close-modal]')) closePortionModal();
-  const option = e.target.closest('[data-variant]');
-  if (option) {
-    const variant = state.pendingModalGroup.find((v) => v.id === Number(option.dataset.variant));
-    if (variant) {
-      addToCart(variant.id, 1, variant);
-      renderProducts();
-      renderCartFab();
-      toast(`Добавлено: ${variant.name} ${variant.weight_label}`);
-    }
-    closePortionModal();
-  }
 });
 
 // --- Корзина ---
@@ -503,15 +514,14 @@ function computeDeliveryFee(subtotal) {
   return DELIVERY_FEE_KOPECKS;
 }
 
+// ВАЖНО: текст обновляем всегда, а не только когда открыт каталог — иначе при
+// изменении корзины на экране "Корзина" плавающая кнопка на каталоге потом
+// показывает устаревшие сумму/количество (баг: 8 шт/832₽ вместо актуальных 5 шт/669₽).
 function renderCartFab() {
   const qty = getCartTotalQuantity();
-  if (qty === 0 || state.currentScreen !== 'catalog') {
-    el.cartFab.hidden = true;
-    return;
-  }
-  el.cartFab.hidden = false;
   el.cartFabCount.textContent = qty;
   el.cartFabSum.textContent = `${formatRub(getCartSubtotal())} ₽`;
+  el.cartFab.hidden = qty === 0 || state.currentScreen !== 'catalog';
 }
 
 function renderCartItem(entry) {
@@ -919,7 +929,7 @@ async function init() {
     el.productList.innerHTML = '<p class="empty-state">Не удалось загрузить каталог</p>';
   }
 
-  const orderId = new URLSearchParams(location.search).get('order_id');
+  const orderId = new URLSearchParams(location.search).get('order_success');
   if (orderId) {
     showOrderSuccess(orderId);
   } else {

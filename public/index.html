@@ -147,14 +147,6 @@
     </button>
   </div>
 
-  <div id="portionModal" class="modal" hidden>
-    <div class="modal-backdrop" data-close-modal></div>
-    <div class="modal-sheet">
-      <h3 id="portionModalTitle"></h3>
-      <div id="portionOptions" class="portion-options"></div>
-    </div>
-  </div>
-
   <div id="productModal" class="modal" hidden>
     <div class="modal-backdrop" data-close-modal></div>
     <div class="modal-sheet product-modal-sheet">
@@ -162,6 +154,7 @@
       <h3 id="productModalName"></h3>
       <div class="product-modal-meta" id="productModalMeta"></div>
       <div class="product-modal-price" id="productModalPrice"></div>
+      <div id="productModalPortions" class="portion-options" hidden></div>
       <div id="productModalDescription" class="product-modal-block" hidden>
         <h4>Описание</h4>
         <p id="productModalDescriptionText"></p>
@@ -169,6 +162,10 @@
       <div id="productModalNutrition" class="product-modal-block" hidden>
         <h4>БЖУ на 100 г</h4>
         <p id="productModalNutritionText"></p>
+      </div>
+      <div id="productModalIngredients" class="product-modal-block" hidden>
+        <h4>Состав</h4>
+        <p id="productModalIngredientsText"></p>
       </div>
       <div id="productModalAction" class="product-modal-action"></div>
     </div>
