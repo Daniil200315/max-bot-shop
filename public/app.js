@@ -44,6 +44,7 @@ const state = {
 
 const el = {
   historyBtn: document.getElementById('historyBtn'),
+  supportBtn: document.getElementById('supportBtn'),
   browserBanner: document.getElementById('browserBanner'),
   tabsPrev: document.getElementById('tabsPrev'),
   tabsNext: document.getElementById('tabsNext'),
@@ -65,7 +66,10 @@ const el = {
   nameInput: document.getElementById('nameInput'),
   phoneInput: document.getElementById('phoneInput'),
   districtSelect: document.getElementById('districtSelect'),
-  addressInput: document.getElementById('addressInput'),
+  streetInput: document.getElementById('streetInput'),
+  houseInput: document.getElementById('houseInput'),
+  apartmentInput: document.getElementById('apartmentInput'),
+  commentInput: document.getElementById('commentInput'),
   dateOptions: document.getElementById('dateOptions'),
   slotOptions: document.getElementById('slotOptions'),
   checkoutSumSubtotal: document.getElementById('checkoutSumSubtotal'),
@@ -261,7 +265,7 @@ function renderVariantCard(group) {
       <div class="product-photo">${photoMarkup(first)}</div>
       <div class="product-info">
         <div class="product-name">${escapeHtml(first.name)}</div>
-        <div class="product-meta">${escapeHtml(first.description)}</div>
+        <div class="product-meta">${escapeHtml(group.map((p) => p.weight_label).join(' · '))}</div>
         <div class="product-price">от ${formatRub(minPrice)} ₽</div>
         ${totalQty > 0 ? `<div class="cart-count-hint">В корзине: ${totalQty} порц.</div>` : ''}
       </div>
@@ -470,6 +474,7 @@ function addToCart(productId, qty, knownProduct) {
   if (!product) return;
   const existing = state.cart.get(productId);
   state.cart.set(productId, { product, quantity: (existing?.quantity || 0) + qty });
+  saveCart();
 }
 
 function removeFromCart(productId, qty) {
@@ -478,10 +483,37 @@ function removeFromCart(productId, qty) {
   const nextQty = existing.quantity - qty;
   if (nextQty <= 0) state.cart.delete(productId);
   else state.cart.set(productId, { ...existing, quantity: nextQty });
+  saveCart();
 }
 
 function deleteFromCart(productId) {
   state.cart.delete(productId);
+  saveCart();
+}
+
+// Корзина привязана к user_id из MAX и живёт на сервере (таблица carts) — гостям
+// (запущено вне MAX, id — временный Date.now()) сохранение не нужно, всё равно
+// не к чему привязать между сессиями.
+async function loadCart() {
+  if (!state.isMaxContext) return;
+  try {
+    const { items, removedNames } = await apiFetch(`/cart?user_id=${state.user.id}`);
+    state.cart = new Map(items.map((entry) => [entry.product.id, { product: entry.product, quantity: entry.quantity }]));
+    if (removedNames.length > 0) {
+      toast(`Убраны из корзины (больше недоступны): ${removedNames.join(', ')}`);
+    }
+  } catch (err) {
+    console.error('Не удалось восстановить корзину:', err);
+  }
+}
+
+function saveCart() {
+  if (!state.isMaxContext) return;
+  const items = [...state.cart.entries()].map(([product_id, entry]) => ({ product_id, quantity: entry.quantity }));
+  apiFetch('/cart', {
+    method: 'PUT',
+    body: JSON.stringify({ user_id: state.user.id, items }),
+  }).catch((err) => console.error('Не удалось сохранить корзину:', err));
 }
 
 function getCartSubtotal() {
@@ -707,8 +739,12 @@ el.checkoutForm.addEventListener('submit', async (e) => {
     toast('Выберите район');
     return;
   }
-  if (!el.addressInput.value.trim()) {
-    toast('Укажите адрес доставки');
+  if (!el.streetInput.value.trim()) {
+    toast('Укажите улицу');
+    return;
+  }
+  if (!el.houseInput.value.trim()) {
+    toast('Укажите номер дома');
     return;
   }
   const selectedDate = state.checkout.dateOptions[state.checkout.selectedDateIndex];
@@ -731,7 +767,10 @@ el.checkoutForm.addEventListener('submit', async (e) => {
         user_id: state.user.id,
         user_name: el.nameInput.value.trim(),
         phone: el.phoneInput.value,
-        delivery_address: `г. Новокузнецк, ${el.addressInput.value.trim()}`,
+        street: el.streetInput.value.trim(),
+        house: el.houseInput.value.trim(),
+        apartment: el.apartmentInput.value.trim(),
+        comment: el.commentInput.value.trim(),
         district: el.districtSelect.value,
         delivery_date: selectedDate.dateISO,
         delivery_time_slot: state.checkout.selectedSlot,
@@ -846,6 +885,7 @@ async function openOrderDetail(orderId) {
         <div class="order-detail-row"><span>Время</span><span>${escapeHtml(order.delivery_time_slot)}</span></div>
         <div class="order-detail-row"><span>Район</span><span>${escapeHtml(order.district)}</span></div>
         <div class="order-detail-row"><span>Адрес</span><span>${escapeHtml(order.delivery_address)}</span></div>
+        ${order.comment ? `<div class="order-detail-row"><span>Комментарий</span><span>${escapeHtml(order.comment)}</span></div>` : ''}
       </div>
       <div class="order-detail-block">
         <h4>Оплата</h4>
@@ -860,6 +900,15 @@ async function openOrderDetail(orderId) {
 }
 
 el.historyBtn.addEventListener('click', openHistory);
+
+const SUPPORT_BOT_URL = 'https://max.ru/id4217162357_bot';
+el.supportBtn.addEventListener('click', () => {
+  if (window.WebApp?.openLink) {
+    window.WebApp.openLink(SUPPORT_BOT_URL);
+  } else {
+    window.open(SUPPORT_BOT_URL, '_blank', 'noopener');
+  }
+});
 
 // --- Инициализация ---
 async function init() {
@@ -878,6 +927,10 @@ async function init() {
   } catch (err) {
     el.productList.innerHTML = '<p class="empty-state">Не удалось загрузить каталог</p>';
   }
+
+  await loadCart();
+  if (state.catalog.length > 0) renderProducts();
+  renderCartFab();
 
   const orderId = new URLSearchParams(location.search).get('order_success');
   if (orderId) {

@@ -1,5 +1,5 @@
 import express from 'express';
-import { all, get, insert } from '../db.js';
+import { all, get, insert, run } from '../db.js';
 import { MIN_ORDER_KOPECKS, isBelowMinimum, computeDeliveryFee } from '../lib/pricing.js';
 import { buildDateOptions, isDeliverySelectionValid } from '../lib/delivery.js';
 
@@ -57,20 +57,42 @@ apiRouter.get('/delivery-options', (req, res) => {
   res.json({ dateOptions: buildDateOptions() });
 });
 
+const FIELD_LIMITS = { street: 200, house: 20, apartment: 20, comment: 500 };
+
 apiRouter.post('/orders', (req, res) => {
   const {
     user_id,
     user_name = '',
     phone,
-    delivery_address,
+    street = '',
+    house = '',
+    apartment = '',
+    comment = '',
     district,
     delivery_date,
     delivery_time_slot,
     items,
   } = req.body || {};
 
-  if (!user_id || !phone || !delivery_address || !district || !delivery_date || !delivery_time_slot) {
+  const trimmedStreet = String(street).trim();
+  const trimmedHouse = String(house).trim();
+  const trimmedApartment = String(apartment).trim();
+  const trimmedComment = String(comment).trim();
+
+  if (!user_id || !phone || !trimmedStreet || !trimmedHouse || !district || !delivery_date || !delivery_time_slot) {
     return res.status(400).json({ error: 'Заполните все обязательные поля' });
+  }
+  if (trimmedStreet.length > FIELD_LIMITS.street) {
+    return res.status(400).json({ error: `Улица не длиннее ${FIELD_LIMITS.street} символов` });
+  }
+  if (trimmedHouse.length > FIELD_LIMITS.house) {
+    return res.status(400).json({ error: `Номер дома не длиннее ${FIELD_LIMITS.house} символов` });
+  }
+  if (trimmedApartment.length > FIELD_LIMITS.apartment) {
+    return res.status(400).json({ error: `Номер квартиры не длиннее ${FIELD_LIMITS.apartment} символов` });
+  }
+  if (trimmedComment.length > FIELD_LIMITS.comment) {
+    return res.status(400).json({ error: `Комментарий не длиннее ${FIELD_LIMITS.comment} символов` });
   }
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'Корзина пуста' });
@@ -78,6 +100,8 @@ apiRouter.post('/orders', (req, res) => {
   if (!isDeliverySelectionValid(delivery_date, delivery_time_slot)) {
     return res.status(400).json({ error: 'Выбранные дата и время доставки уже недоступны, обновите страницу' });
   }
+
+  const delivery_address = `г. Новокузнецк, ул. ${trimmedStreet}, д. ${trimmedHouse}${trimmedApartment ? `, кв. ${trimmedApartment}` : ''}`;
 
   const resolvedItems = [];
   let subtotal_kopecks = 0;
@@ -111,11 +135,11 @@ apiRouter.post('/orders', (req, res) => {
 
   const orderId = insert(
     `INSERT INTO orders
-      (user_id, user_name, phone, delivery_address, district, delivery_date, delivery_time_slot,
-       subtotal_kopecks, delivery_fee_kopecks, total_kopecks, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'created')`,
-    [user_id, user_name, phone, delivery_address, district, delivery_date, delivery_time_slot,
-      subtotal_kopecks, delivery_fee_kopecks, total_kopecks]
+      (user_id, user_name, phone, delivery_address, street, house, apartment, comment, district,
+       delivery_date, delivery_time_slot, subtotal_kopecks, delivery_fee_kopecks, total_kopecks, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'created')`,
+    [user_id, user_name, phone, delivery_address, trimmedStreet, trimmedHouse, trimmedApartment, trimmedComment,
+      district, delivery_date, delivery_time_slot, subtotal_kopecks, delivery_fee_kopecks, total_kopecks]
   );
 
   for (const item of resolvedItems) {
@@ -146,4 +170,66 @@ apiRouter.get('/orders/:id', (req, res) => {
   const order = getOrderWithItems(req.params.id);
   if (!order) return res.status(404).json({ error: 'Заказ не найден' });
   res.json(order);
+});
+
+// Корзина привязана к user_id из MAX и переживает закрытие мини-приложения.
+// Цена всегда берётся из текущей записи товара в БД, а не из сохранённой
+// корзины — так пересчёт цены при обновлении каталога происходит сам собой.
+// Товары, снятые с продажи (is_active=0) или удалённые, тихо выпадают из
+// корзины при чтении; их названия возвращаются в removedNames для тоста на фронте.
+function reconcileCart(userId) {
+  const row = get('SELECT items FROM carts WHERE user_id = ?', [userId]);
+  if (!row) return { items: [], removedNames: [] };
+
+  let stored;
+  try {
+    stored = JSON.parse(row.items);
+  } catch {
+    stored = [];
+  }
+  if (!Array.isArray(stored)) stored = [];
+
+  const items = [];
+  const removedNames = [];
+  for (const entry of stored) {
+    const product = get('SELECT * FROM products WHERE id = ?', [entry.product_id]);
+    if (!product || !product.is_active) {
+      if (product) removedNames.push(product.name);
+      continue;
+    }
+    const quantity = Number(entry.quantity);
+    if (!Number.isInteger(quantity) || quantity < 1) continue;
+    items.push({ product: toProductDto(product), quantity });
+  }
+  return { items, removedNames };
+}
+
+apiRouter.get('/cart', (req, res) => {
+  const userId = Number(req.query.user_id);
+  if (!userId) return res.status(400).json({ error: 'user_id обязателен' });
+  res.json(reconcileCart(userId));
+});
+
+apiRouter.put('/cart', (req, res) => {
+  const { user_id, items } = req.body || {};
+  const userId = Number(user_id);
+  if (!userId) return res.status(400).json({ error: 'user_id обязателен' });
+  if (!Array.isArray(items)) return res.status(400).json({ error: 'items должен быть массивом' });
+
+  const cleaned = items
+    .filter((i) => i && Number.isInteger(Number(i.product_id)) && Number.isInteger(Number(i.quantity)) && Number(i.quantity) > 0)
+    .map((i) => ({ product_id: Number(i.product_id), quantity: Number(i.quantity) }));
+
+  if (cleaned.length === 0) {
+    run('DELETE FROM carts WHERE user_id = ?', [userId]);
+    return res.json({ ok: true });
+  }
+
+  const existing = get('SELECT user_id FROM carts WHERE user_id = ?', [userId]);
+  if (existing) {
+    run('UPDATE carts SET items = ?, updated_at = datetime(\'now\') WHERE user_id = ?', [JSON.stringify(cleaned), userId]);
+  } else {
+    insert('INSERT INTO carts (user_id, items, updated_at) VALUES (?, ?, datetime(\'now\'))', [userId, JSON.stringify(cleaned)]);
+  }
+  res.json({ ok: true });
 });

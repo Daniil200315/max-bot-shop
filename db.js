@@ -62,6 +62,12 @@ CREATE TABLE IF NOT EXISTS payments (
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (order_id) REFERENCES orders(id)
 );
+
+CREATE TABLE IF NOT EXISTS carts (
+  user_id INTEGER PRIMARY KEY,
+  items TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `;
 
 export async function initDb() {
@@ -94,6 +100,10 @@ function runMigrations() {
   ensureColumn('products', 'nutrition_info', "TEXT DEFAULT ''");
   ensureColumn('products', 'ingredients', "TEXT DEFAULT ''");
   ensureColumn('orders', 'district', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('orders', 'street', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('orders', 'house', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('orders', 'apartment', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('orders', 'comment', "TEXT NOT NULL DEFAULT ''");
 }
 
 // Upsert по естественному ключу (name, category, weight_label) — id товара не меняется,

@@ -12,7 +12,10 @@
   <div id="app">
     <header class="topbar">
       <div class="brand">Родная Земля</div>
-      <button id="historyBtn" class="icon-btn" aria-label="История заказов">🧾</button>
+      <div class="topbar-actions">
+        <button id="supportBtn" class="icon-btn" aria-label="Нужна помощь?" title="Нужна помощь?">💬</button>
+        <button id="historyBtn" class="icon-btn" aria-label="История заказов">🧾</button>
+      </div>
     </header>
 
     <p id="browserBanner" class="browser-banner" hidden>Для заказа откройте приложение через мессенджер MAX</p>
@@ -46,7 +49,7 @@
         <div class="delivery-info-block">
           <h4>Доставка</h4>
           <p>Доставка по г. Новокузнецку</p>
-          <p>Минимальный заказ: 500 ₽</p>
+          <p>Минимальный заказ: 500 ₽ (без учёта доставки)</p>
           <p>Доставка 149 ₽ при заказе от 500 до 749 ₽</p>
           <p>Бесплатная доставка при заказе от 750 ₽</p>
           <p>Доставка в течение выбранного 2-часового интервала</p>
@@ -87,8 +90,22 @@
             </select>
           </label>
           <label class="field">
-            <span>Улица, дом, квартира</span>
-            <input type="text" id="addressInput" placeholder="ул. Ленина, д. 5, кв. 12" />
+            <span>Улица</span>
+            <input type="text" id="streetInput" placeholder="ул. Ленина" maxlength="200" />
+          </label>
+          <div class="field-row">
+            <label class="field">
+              <span>Номер дома</span>
+              <input type="text" id="houseInput" placeholder="5" maxlength="20" />
+            </label>
+            <label class="field">
+              <span>Квартира</span>
+              <input type="text" id="apartmentInput" placeholder="12 (необязательно)" maxlength="20" />
+            </label>
+          </div>
+          <label class="field">
+            <span>Комментарий к доставке</span>
+            <input type="text" id="commentInput" placeholder="Домофон, подъезд, пожелания (необязательно)" maxlength="500" />
           </label>
           <div class="field">
             <span>Дата доставки</span>

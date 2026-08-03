@@ -1,34 +1,45 @@
 // Начальный каталог товаров завода «Родная Земля» (РДЗМ).
-// Фото — реальные превью с rdzm.ru. Там, где для конкретного варианта фасовки/вкуса
-// нет отдельного фото, используется ближайшее похожее (см. комментарии ниже).
+// Фото — оригиналы с rdzm.ru (см. public/img/products/ — скачаны и сжаты локально,
+// см. scripts/fetch-product-images.mjs). Названия, описания, БЖУ и состав сверены
+// с карточками товаров на сайте по состоянию на итерацию 5.
 const rub = (v) => Math.round(v * 100);
 
 const IMG = {
-  milk25: 'https://rdzm.ru/upload/resize_cache/iblock/051/268_268_0/z0ygs1jpzaoyqqhr6k7d5gsp9fdwtejk.JPG',
-  milk3445: 'https://rdzm.ru/upload/resize_cache/iblock/7f4/268_268_0/u6yg9uoemnpvvl0x2v6cdsok2bev3fdw.jpg',
-  kefir: 'https://rdzm.ru/upload/resize_cache/iblock/c22/268_268_0/yqsd6jhf32qqs5jc2zuwywh8356q1cp5.JPG',
-  smetana10: 'https://rdzm.ru/upload/resize_cache/iblock/0aa/268_268_0/rw8x02l4u86exkb7tblvnh55c9pg9kbt.JPG',
-  smetana15: 'https://rdzm.ru/upload/resize_cache/iblock/546/268_268_0/xp8l5waja373bymq431g6vgz8vzxwi7t.JPG',
-  tvorog200: 'https://rdzm.ru/upload/resize_cache/iblock/c47/268_268_0/29u078n3s5qmnmy9m310y9i5c9njgbvv.JPG',
-  tvorog450: 'https://rdzm.ru/upload/resize_cache/iblock/bee/268_268_0/0tbcdp7vihxw814k97xasf9m5gpzw0cw.JPG',
-  yogWhite: 'https://rdzm.ru/upload/resize_cache/iblock/94d/268_268_0/ej8ab5meuuo832j05d1qiavpy2s85clg.jpg',
-  yogBanana: 'https://rdzm.ru/upload/resize_cache/iblock/09b/268_268_0/609hbyvhlm7ntrlc15kaqdz2j4c2y0le.jpg',
-  yogStrawberry: 'https://rdzm.ru/upload/resize_cache/iblock/323/268_268_0/sldufbg2kbmn0fwmm2z3u1m9cth3gkj6.jpg',
-  yogRaspberry: 'https://rdzm.ru/upload/resize_cache/iblock/320/268_268_0/0nwc71ucedwshxq0da9aj3x6uzq9jukd.jpg',
-  yogPapaya: 'https://rdzm.ru/upload/resize_cache/iblock/2ae/268_268_0/no4ry2xz5sagqi4pg3kox26tngmbont4.jpg',
-  yogPeach: 'https://rdzm.ru/upload/resize_cache/iblock/a30/268_268_0/s29pagiemu7gsxkodp7ojw3qfz7shzcd.jpg',
-  yogBlueberry: 'https://rdzm.ru/upload/resize_cache/iblock/73a/268_268_0/pdsro9kcwll6qmpkb1x93iq6vocdb68x.jpg',
-  butter: 'https://rdzm.ru/upload/resize_cache/iblock/b20/268_268_0/zn0a0yiz1ju8ju8cs3oysjrbll2cw5c1.jpg',
-  acidophilin: 'https://rdzm.ru/upload/resize_cache/iblock/dd2/268_268_0/9nusiu9wp5548xpzful75cshhsivbdes.JPG',
-  prostokvasha: 'https://rdzm.ru/upload/resize_cache/iblock/597/268_268_0/dcbag3glkevwkm6o1j909hr3qa5dnngy.JPG',
-  ryazhenka: 'https://rdzm.ru/upload/resize_cache/iblock/392/268_268_0/lsek71blcj7c3c96ai1a4i7ra8smuglw.JPG',
-  snezhok900: 'https://rdzm.ru/upload/resize_cache/iblock/17c/268_268_0/c0df97ek2baa91lseu2vwr59sczrgnk3.JPG',
-  snezhok470: 'https://rdzm.ru/upload/resize_cache/iblock/7dd/268_268_0/bm12rjcefrrn8jx48yfyq763h9voqitt.JPG',
-  cheeseFenugreek: 'https://rdzm.ru/upload/resize_cache/iblock/efe/268_268_0/lolcc8nhoxq8bq63727jzx21d26u5n46.jpg',
-  cheeseWholeMilk: 'https://rdzm.ru/upload/resize_cache/iblock/623/268_268_0/i900y50avme1m8r0q6yum3pti7do16p4.jpg',
-  cheeseGeorgievsky: 'https://rdzm.ru/upload/resize_cache/iblock/fe6/268_268_0/f2x3ead5717fhz8o109ymgs00wa0npa7.jpg',
-  cheeseCreamy: 'https://rdzm.ru/upload/resize_cache/iblock/f4e/268_268_0/c90uiv0y6bvdgqi25nboul28yu09b9da.jpg',
-  cheeseCreamyFenugreek: 'https://rdzm.ru/upload/resize_cache/iblock/b8c/268_268_0/lt60pksqfz18ododxnkhq3xe5or32tei.jpg',
+  milk25: '/img/products/milk25.jpg',
+  milk3445: '/img/products/milk3445.jpg',
+  kefir: '/img/products/kefir.jpg',
+  smetana10: '/img/products/smetana10.jpg',
+  smetana15: '/img/products/smetana15.jpg',
+  smetana20: '/img/products/smetana20.jpg',
+  tvorog200: '/img/products/tvorog200.jpg',
+  tvorog450: '/img/products/tvorog450.jpg',
+  yogWhite: '/img/products/yog-white.jpg',
+  yogBanana: '/img/products/yog-banana.jpg',
+  yogStrawberry: '/img/products/yog-strawberry.jpg',
+  yogRaspberry: '/img/products/yog-raspberry.jpg',
+  yogPapaya: '/img/products/yog-papaya.jpg',
+  yogPeach: '/img/products/yog-peach.jpg',
+  yogBlueberry: '/img/products/yog-blueberry.jpg',
+  yogKiwi: '/img/products/yog-kiwi.jpg',
+  yogMango: '/img/products/yog-mango.jpg',
+  butter180: '/img/products/butter180.jpg',
+  butter400: '/img/products/butter400.jpg',
+  acidophilin: '/img/products/acidophilin.jpg',
+  prostokvasha: '/img/products/prostokvasha.jpg',
+  ryazhenka: '/img/products/ryazhenka.jpg',
+  snezhok900: '/img/products/snezhok900.jpg',
+  snezhok470: '/img/products/snezhok470.jpg',
+  cheesePlain: '/img/products/cheese-plain.jpg',
+  cheeseClassic: '/img/products/cheese-classic.jpg',
+  cheeseCreamy: '/img/products/cheese-creamy.jpg',
+  cheeseCreamyFenugreek: '/img/products/cheese-creamy-fenugreek.jpg',
+  cheeseFenugreek: '/img/products/cheese-fenugreek.jpg',
+  cheeseGarlic: '/img/products/cheese-garlic.jpg',
+  cheeseProvence: '/img/products/cheese-provence.jpg',
+  cheeseGeorgievsky: '/img/products/cheese-georgievsky.jpg',
+  cheeseHalloumi: '/img/products/cheese-halloumi.jpg',
+  cheeseHalloumiProvence: '/img/products/cheese-halloumi-provence.jpg',
+  cheeseBelperKnolle: '/img/products/cheese-belper-knolle.jpg',
 };
 
 export const products = [
@@ -116,7 +127,7 @@ export const products = [
     ingredients: 'Нормализованные сливки, закваска',
   },
   {
-    name: 'Сметана 20%', category: 'Сметана', price_kopecks: rub(121), unit: 'шт', weight_label: '0,3 кг', image_url: IMG.smetana15, sort_order: 3, // заглушка: фото Сметаны 15%
+    name: 'Сметана 20%', category: 'Сметана', price_kopecks: rub(121), unit: 'шт', weight_label: '0,3 кг', image_url: IMG.smetana20, sort_order: 3,
     description: 'Сметана РОДНАЯ ЗЕМЛЯ 20%, без ЗМЖ — кисломолочный нежный продукт с высокими питательными свойствами. Содержит витамины E, A, B12, B2, C, PP, кальций, лецитин. Можно добавлять в горячие и холодные супы, а также в драники и творожники.',
     nutrition_info: '204 ккал, Б 2,5 г, Ж 20 г, У 3,4 г на 100 г',
     ingredients: 'Нормализованные сливки, закваска',
@@ -135,8 +146,10 @@ export const products = [
     nutrition_info: '121 ккал, Б 16 г, Ж 5 г, У 3 г на 100 г',
     ingredients: 'Нормализованное молоко, закваска',
   },
+  // «Творог Деревенский» на сайте rdzm.ru не найден (подтверждено research-агентом
+  // и владельцем каталога) — деактивирован, а не удалён, чтобы не сломать историю заказов.
   {
-    name: 'Творог Деревенский', category: 'Творог', price_kopecks: rub(250), unit: 'шт', weight_label: '450 г', image_url: IMG.tvorog450, sort_order: 3, // цена уточняется у заказчика
+    name: 'Творог Деревенский', category: 'Творог', price_kopecks: rub(250), unit: 'шт', weight_label: '450 г', image_url: IMG.tvorog450, sort_order: 3, is_active: false,
     description: 'Творог РОДНАЯ ЗЕМЛЯ 5%, без ЗМЖ — высокобелковый кисломолочный продукт, богатый кальцием и незаменимыми аминокислотами. Содержание белка сопоставимо с рыбой или мясом, при этом усваивается легче.',
     nutrition_info: '121 ккал, Б 16 г, Ж 5 г, У 3 г на 100 г',
     ingredients: 'Нормализованное молоко, закваска',
@@ -167,14 +180,16 @@ export const products = [
     nutrition_info: '74 ккал, Б 2,8 г, Ж 2,5 г, У 10 г на 100 г',
     ingredients: 'Цельное молоко, обезжиренное молоко, фруктовый наполнитель «Персик-маракуйя» (пюре яблока, пюре персика, концентрированный сок маракуйи, сахар, загуститель — пектин, регулятор кислотности — лимонная кислота), закваска йогуртовых культур',
   },
+  // Раньше Киви и Манго ошибочно показывались с фото Черники-голубики — заменено на
+  // индивидуальные фото каждого вкуса (проверено и сверено с rdzm.ru).
   {
-    name: 'Йогурт Киви 2,5%', category: 'Йогурты', price_kopecks: rub(71), unit: 'шт', weight_label: '180 г', image_url: IMG.yogBlueberry, sort_order: 7, // заглушка: фото Черники-голубики
+    name: 'Йогурт Киви 2,5%', category: 'Йогурты', price_kopecks: rub(71), unit: 'шт', weight_label: '180 г', image_url: IMG.yogKiwi, sort_order: 7,
     description: 'Термостатный йогурт приготовлен по традиционному рецепту из натурального молока с ферм из села Акшуево Кемеровской области. Йогурт сквашивается прямо в стаканчике, а ягодный наполнитель придаёт ему уникальный вкус.',
     nutrition_info: '78 ккал, Б 2,8 г, Ж 2,5 г, У 11,2 г на 100 г',
     ingredients: 'Цельное молоко, обезжиренное молоко, фруктовый наполнитель «Киви» (киви свежемороженый, сахар, вода, загуститель — пектин, регулятор кислотности — лимонная кислота), закваска йогуртовых культур',
   },
   {
-    name: 'Йогурт Манго 2,5%', category: 'Йогурты', price_kopecks: rub(71), unit: 'шт', weight_label: '180 г', image_url: IMG.yogBlueberry, sort_order: 8, // заглушка: фото Черники-голубики
+    name: 'Йогурт Манго 2,5%', category: 'Йогурты', price_kopecks: rub(71), unit: 'шт', weight_label: '180 г', image_url: IMG.yogMango, sort_order: 8,
     description: 'Термостатный йогурт приготовлен по традиционному рецепту из натурального молока с ферм из села Акшуево Кемеровской области. Йогурт сквашивается прямо в стаканчике, а ягодный наполнитель придаёт ему уникальный вкус.',
     nutrition_info: '78 ккал, Б 2,8 г, Ж 2,5 г, У 11,2 г на 100 г',
     ingredients: 'Цельное молоко, обезжиренное молоко, фруктовый наполнитель «Манго» (пюре манго, пюре персика, сахар, вода, загуститель — пектин, регулятор кислотности — лимонная кислота), закваска йогуртовых культур',
@@ -202,59 +217,88 @@ export const products = [
 
   // --- Масло ---
   {
-    name: 'Масло сливочное 82,5%', category: 'Масло', price_kopecks: rub(269), unit: 'шт', weight_label: '180 г', image_url: IMG.butter, sort_order: 1,
+    name: 'Масло сливочное 82,5%', category: 'Масло', price_kopecks: rub(269), unit: 'шт', weight_label: '180 г', image_url: IMG.butter180, sort_order: 1,
     description: 'Традиционное сливочное масло с массовой долей жира 82,5%. В составе только настоящие сливки, приготовлено по традиционной технологии сбивания.',
     nutrition_info: '748 ккал, Б 0,6 г, Ж 82,5 г, У 0,8 г на 100 г',
     ingredients: 'Пастеризованные сливки',
   },
+  // Раньше у 400г была та же картинка, что у 180г — заменено на собственное фото упаковки.
   {
-    name: 'Масло сливочное 82,5%', category: 'Масло', price_kopecks: rub(550), unit: 'шт', weight_label: '400 г', image_url: IMG.butter, sort_order: 2, // цена уточняется у заказчика
+    name: 'Масло сливочное 82,5%', category: 'Масло', price_kopecks: rub(550), unit: 'шт', weight_label: '400 г', image_url: IMG.butter400, sort_order: 2, // цена уточняется у заказчика
     description: 'Традиционное сливочное масло с массовой долей жира 82,5%. В составе только настоящие сливки, приготовлено по традиционной технологии сбивания.',
     nutrition_info: '748 ккал, Б 0,6 г, Ж 82,5 г, У 0,8 г на 100 г',
     ingredients: 'Пастеризованные сливки',
   },
 
-  // --- Сыры: продаются фиксированными порциями, у каждой порции своя запись ---
-  ...cheesePortions('Сыр Родная земля из цельного молока', 1149, [230, 345, 575], 1, IMG.cheeseWholeMilk, {
-    description: 'Сыр с насыщенным сливочным вкусом и медовым ароматом. Лёгкая кислинка придаёт ему нотки пикантности.',
-    nutrition_info: '189–340 ккал, Б 13–24 г, Ж 18–31 г на 100 г',
+  // --- Сыры: продаются фиксированными порциями (200/300/500 г, цена за кг) —
+  // модель фасовки не менялась, изменены только названия/фото/описания/БЖУ/состав
+  // по данным с карточек товаров rdzm.ru (итерация 5). Названия и порядок — как на сайте.
+  ...cheesePortions('Сыр полутвердый', 1149, [230, 345, 575], 1, IMG.cheesePlain, {
+    description: 'Сыр со сроком созревания 3 месяца, с приятным маслянистым ощущением во рту, умеренно солёный.',
+    nutrition_info: '189–340 ккал, Б 18–31 г, Ж 13–24 г на 100 г',
     ingredients: 'Целое молоко, соль поваренная пищевая, молокосвертывающий фермент, закваска',
   }),
-  ...cheesePortions('Сыр Родная земля с пажитником', 1149, [230, 345, 575], 4, IMG.cheeseFenugreek, {
-    description: 'Сыр с насыщенным ореховым вкусом. Ноту пикантности ему добавляет пажитник-семена растения, богатые витаминами и антиоксидантами, которые оздоравливают организм.',
-    nutrition_info: '189–340 ккал, Б 13–24 г, Ж 18–31 г на 100 г',
+  ...cheesePortions('Сыр полутвердый классический', 1149, [230, 345, 575], 4, IMG.cheeseClassic, {
+    description: 'Сыр с насыщенным сливочным вкусом и медовым ароматом. Лёгкая кислинка придаёт ему нотки пикантности.',
+    nutrition_info: '189–340 ккал, Б 18–31 г, Ж 13–24 г на 100 г',
+    ingredients: 'Целое молоко, соль поваренная пищевая, молокосвертывающий фермент, закваска',
+  }),
+  ...cheesePortions('Сыр полутвердый сливочный', 899, [180, 270, 450], 7, IMG.cheeseCreamy, {
+    description: 'Полутвёрдый сыр сливочный идеален для бутербродов. Сыр созревает в специальном пакете и не имеет характерной корочки. Прекрасно плавится и имеет выраженный сливочный вкус.',
+    nutrition_info: '189–340 ккал, Б 18–31 г, Ж 13–24 г на 100 г',
+    ingredients: 'Целое молоко, соль пищевая, закваска из термофильных молочнокислых микроорганизмов, молокосвертывающий ферментный препарат микробного происхождения',
+  }),
+  ...cheesePortions('Сыр полутвердый сливочный с пажитником', 899, [180, 270, 450], 10, IMG.cheeseCreamyFenugreek, {
+    description: 'Полутвёрдый сыр сливочный с пажитником идеален для бутербродов. Сыр созревает в специальном пакете и не имеет характерной корочки. Прекрасно плавится и имеет выраженный сливочный вкус.',
+    nutrition_info: '226–228 ккал, Б 18–25 г, Ж 14–24 г на 100 г',
+    ingredients: 'Целое молоко, соль пищевая, семена пажитника, закваска из термофильных молочнокислых микроорганизмов, молокосвертывающий ферментный препарат микробного происхождения',
+  }),
+  ...cheesePortions('Сыр полутвердый с пажитником', 1149, [230, 345, 575], 13, IMG.cheeseFenugreek, {
+    description: 'Сыр с насыщенным ореховым вкусом. Ноту пикантности ему добавляет пажитник — семена растения, богатые витаминами и антиоксидантами, которые оздоравливают организм.',
+    nutrition_info: '189–340 ккал, Б 18–31 г, Ж 13–24 г на 100 г',
     ingredients: 'Целое молоко, соль поваренная пищевая, семена пажитника, молокосвертывающий фермент, закваска',
   }),
-  ...cheesePortions('Сыр Родная земля с прованскими травами', 1149, [230, 345, 575], 7, IMG.cheeseFenugreek, { // заглушка: фото сыра с пажитником
-    description: 'Сыр естественного созревания с прованскими травами — уникальная рецептура из самой Франции. Прованские травы добавляют классическому сливочному сыру особый аромат и неповторимый вкус.',
-    nutrition_info: '189–340 ккал, Б 13–24 г, Ж 18–31 г на 100 г',
-    ingredients: 'Целое молоко, соль поваренная пищевая, прованские травы, молокосвертывающий фермент, закваска',
-  }),
-  ...cheesePortions('Сыр Родная земля с чесноком', 1149, [230, 345, 575], 10, IMG.cheeseFenugreek, { // заглушка: фото сыра с пажитником
-    description: 'Нежный полутвёрдый сыр естественного созревания с пикантным вкусом чеснока. Сыр эластичный по структуре, сбалансированный по соли и содержанию чеснока в составе.',
-    nutrition_info: '189–340 ккал, Б 13–24 г, Ж 18–31 г на 100 г',
+  ...cheesePortions('Сыр полутвердый с чесноком', 1149, [230, 345, 575], 16, IMG.cheeseGarlic, {
+    description: 'Нежный полутвёрдый сыр естественного созревания с пикантным вкусом чеснока. Сыр атласный по структуре, сбалансированный по соли и содержанию чеснока в составе.',
+    nutrition_info: '189–340 ккал, Б 18–31 г, Ж 13–24 г на 100 г',
     ingredients: 'Целое молоко, соль поваренная пищевая, чеснок, молокосвертывающий фермент, закваска',
   }),
-  ...cheesePortions('Сыр Родная земля, созревание 3 мес', 1149, [230, 345, 575], 13, IMG.cheeseWholeMilk, {
-    description: 'Сыр со сроком созревания 3 месяца, с приятным маслянистым ощущением во рту, умеренно солёный.',
-    nutrition_info: '189–340 ккал, Б 13–24 г, Ж 18–31 г на 100 г',
-    ingredients: 'Целое молоко, соль поваренная пищевая, молокосвертывающий фермент, закваска',
+  ...cheesePortions('Сыр полутвердый с прованскими травами', 1149, [230, 345, 575], 19, IMG.cheeseProvence, {
+    description: 'Сыр естественного созревания с прованскими травами — уникальная рецептура из самой Франции. Прованские травы добавляют классическому сливочному сыру особый аромат и неповторимый вкус.',
+    nutrition_info: '189–340 ккал, Б 18–31 г, Ж 13–24 г на 100 г',
+    ingredients: 'Целое молоко, соль поваренная пищевая, прованские травы, молокосвертывающий фермент, закваска',
   }),
-  ...cheesePortions('Сыр Георгиевский', 1199, [240, 360, 600], 16, IMG.cheeseGeorgievsky, {
-    description: 'Георгиевский обладает выраженным сливочным вкусом, но при всём этом с нотками лёгкой кислинки и остроты, пластичной текстурой. Можно широко применять в кулинарии — от простых бутербродов до супов и выпечки. Быстро тает — удобно для фондю и тонкой корочки на запеканке. Превосходно сочетается с винами, крекерами и фруктами.',
-    nutrition_info: '226–288 ккал, Б от 14 г, Ж 18–25 г на 100 г',
+  ...cheesePortions('Сыр полутвердый Георгиевский', 1199, [240, 360, 600], 22, IMG.cheeseGeorgievsky, {
+    description: 'Георгиевский обладает выраженным сливочным вкусом, но при всём этом с нотками лёгкой кислинки и остроты, пластичной текстурой. Сыр можно широко применять в кулинарии — от простых бутербродов до супов и выпечки. Быстро тает — удобно для фондю и сырной корочки на запеканке. И конечно, он превосходно сочетается с винами, крекерами и фруктами и украсит любую корзину для пикника!',
+    nutrition_info: '226–288 ккал, Б 18–25 г, Ж от 14 г на 100 г',
     ingredients: 'Целое молоко, соль пищевая, закваска из мезофильных и термофильных молочнокислых микроорганизмов, молокосвертывающий ферментный препарат микробного происхождения',
   }),
-  ...cheesePortions('Сыр Сливочный', 899, [180, 270, 450], 19, IMG.cheeseCreamy, {
-    description: 'Полутвёрдый сыр сливочный идеален для бутербродов. Сыр созревает в специальном пакете и не имеет характерной корочки. Прекрасно плавится и имеет выраженный сливочный вкус.',
-    nutrition_info: '189–340 ккал, Б 13–24 г, Ж 18–31 г на 100 г',
-    ingredients: 'Целое молоко, соль пищевая, закваска из термофильных молочнокислых микроорганизмов, молокосвертывающий препарат микробного происхождения',
-  }),
-  ...cheesePortions('Сыр Сливочный с пажитником', 899, [180, 270, 450], 22, IMG.cheeseCreamyFenugreek, {
-    description: 'Полутвёрдый сыр сливочный с пажитником идеален для бутербродов. Сыр созревает в специальном пакете и не имеет характерной корочки. Прекрасно плавится и имеет выраженный сливочный вкус.',
-    nutrition_info: '226–228 ккал, Б 14–24 г, Ж 18–25 г на 100 г',
-    ingredients: 'Целое молоко, соль пищевая, семена пажитника, закваска из термофильных молочнокислых микроорганизмов, молокосвертывающий препарат микробного происхождения',
-  }),
+
+  // Новые позиции (ранее отсутствовали в каталоге бота). Продаются фиксированным
+  // куском, а не порциями на развес — цена НЕ подтверждена (сайт отдаёт её через
+  // JS, статический разбор карточки товара её не видит). price_kopecks ниже —
+  // ЗАГЛУШКА для промежуточного релиза, требует подтверждения у заказчика перед тем,
+  // как эти два товара реально начнут продаваться.
+  {
+    name: 'Сыр Халлуми классический', category: 'Сыры', price_kopecks: rub(249), unit: 'шт', weight_label: '200 г', image_url: IMG.cheeseHalloumi, sort_order: 25,
+    description: 'Рассольный сыр слегка скрипит на зубах, объясняется это повышенным содержанием кальция и жирностью, при которой не повреждается белковая структура. Вкус сливочный умеренно солёный.',
+    nutrition_info: '236–297,7 ккал, Б 21–28,6 г, Ж 13,5–23,5 г на 100 г',
+    ingredients: 'Целое молоко, соль пищевая, молокосвертывающий фермент микробного происхождения',
+  },
+  {
+    name: 'Сыр Халлуми с прованскими травами', category: 'Сыры', price_kopecks: rub(249), unit: 'шт', weight_label: '200 г', image_url: IMG.cheeseHalloumiProvence, sort_order: 26,
+    description: 'Рассольный сыр слегка скрипит на зубах, объясняется это повышенным содержанием кальция и жирностью, при которой не повреждается белковая структура. Прованские травы добавляют особый аромат и неповторимый вкус.',
+    nutrition_info: '236–297,7 ккал, Б 21–28,6 г, Ж 13,5–23,5 г на 100 г',
+    ingredients: 'Целое молоко, прованские травы, соль пищевая, молокосвертывающий фермент микробного происхождения',
+  },
+  // БЖУ на странице товара отдаётся в нечитаемом виде (похоже на ошибку вёрстки
+  // самого сайта) — не указываем, чтобы не показать клиенту недостоверные цифры.
+  {
+    name: 'Сыр Белпер Кнолле', category: 'Сыры', price_kopecks: rub(199), unit: 'шт', weight_label: '60–100 г', image_url: IMG.cheeseBelperKnolle, sort_order: 27,
+    description: '',
+    nutrition_info: '',
+    ingredients: 'Целое молоко, закваска из мезофильных молочнокислых микроорганизмов, ферментный препарат, соль пищевая, чёрный перец',
+  },
 ];
 
 function cheesePortions(name, pricePerKg, portionPrices, sortOrderStart, imageUrl, info) {

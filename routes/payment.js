@@ -146,6 +146,9 @@ export function createPaymentRouter(bot) {
         run('UPDATE orders SET status = ?, updated_at = datetime(\'now\') WHERE id = ?', ['paid', order.id]);
         const paidOrder = get('SELECT * FROM orders WHERE id = ?', [order.id]);
         const items = all('SELECT * FROM order_items WHERE order_id = ?', [order.id]);
+        // Корзина на сервере хранится до фактической оплаты (не до создания заказа) —
+        // если оплата не состоится, при повторном открытии клиент увидит те же товары.
+        run('DELETE FROM carts WHERE user_id = ?', [paidOrder.user_id]);
         await notifySupportChat(bot, { ...paidOrder, items });
         await notifyClient(bot, paidOrder.user_id, 'paid', paidOrder);
         console.log('Webhook: заказ помечен оплаченным', { order_id: order.id, payment_id: payment.id });
